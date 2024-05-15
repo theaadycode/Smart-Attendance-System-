@@ -1,99 +1,53 @@
 import cv2
 import os
-import tkinter as tk
-from tkinter import filedialog
-from PIL import Image, ImageTk
 
 class DataCollectionApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Data Collection App")
-
-        self.name_label = tk.Label(root, text="Enter Your Name:")
-        self.name_label.pack()
-
-        self.name_entry = tk.Entry(root)
-        self.name_entry.pack()
-
-        self.choose_option_label = tk.Label(root, text="Choose an option:")
-        self.choose_option_label.pack()
-
-        self.webcam_button = tk.Button(root, text="Use Webcam", command=self.capture_from_webcam)
-        self.webcam_button.pack()
-
-        self.gallery_button = tk.Button(root, text="Choose from Gallery", command=self.choose_from_gallery)
-        self.gallery_button.pack()
-        
-        self.save_button = tk.Button(root, text="Save Image", command=self.save_image, state=tk.DISABLED)
-        self.save_button.pack()
-
+    def __init__(self):
         self.image_path = None
+        self.student_data_folder = "Student Data"
+        self.data_file = "student_info.txt"
 
-    def capture_from_webcam(self):
+        if not os.path.exists(self.student_data_folder):
+            os.makedirs(self.student_data_folder)
+
+    def capture_front_faces(self, name, reg_number):
         cap = cv2.VideoCapture(0)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        count = 0
 
-        while True:
+        while count < 100:
             ret, frame = cap.read()
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-            cv2.imshow("Webcam", frame)
+            for (x, y, w, h) in faces:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                face_img = gray[y:y + h, x:x + w]
 
-            key = cv2.waitKey(1)
-            if key == 13:  # Enter key
-                face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+                cv2.imshow("Front Face", frame)
 
-                if len(faces) > 0:
-                    name = self.name_entry.get()
-
-                    # Create folder if not exists
-                    folder_path = "student_data"
-                    if not os.path.exists(folder_path):
-                        os.makedirs(folder_path)
-
-                    self.image_path = os.path.join(folder_path, f"{name}_webcam_capture.jpg")
-                    cv2.imwrite(self.image_path, frame)
-                    self.save_button.config(state=tk.NORMAL)  # Enable the Save button
+                if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-                else:
-                    print("No face detected. Please try again.")
 
-            elif key == ord('q'):  # 'q' key to stop webcam and save
-                break
+                if face_img is not None:
+                    cv2.imwrite(os.path.join(self.student_data_folder, f"{name}_{reg_number}_{count}.jpg"), face_img)
+                    count += 1
 
         cap.release()
         cv2.destroyAllWindows()
 
-    def save_image(self):
-        if self.image_path:
-            name = self.name_entry.get()
+        self.save_student_info(name, reg_number)
 
-            folder_path = "student_data"
-            new_image_path = os.path.join(folder_path, f"{name}_webcam_capture_saved.jpg")
-
-            # Rename the file and save
-            os.rename(self.image_path, new_image_path)
-            self.image_path = None
-            self.save_button.config(state=tk.DISABLED)  # Disable the Save button
-
-    def choose_from_gallery(self):
-        name = self.name_entry.get()
-
-        # Create folder if not exists
-        folder_path = "student_data"
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
-        file_path = filedialog.askopenfilename(title="Select a picture", filetypes=[("Image files", "*.jpg;*.png")])
-
-        if file_path:
-            image = Image.open(file_path)
-            image.show()
-            self.image_path = os.path.join(folder_path, f"{name}_gallery_picture.jpg")
-            image.save(self.image_path)
-
+    def save_student_info(self, name, reg_number):
+        with open(os.path.join(self.student_data_folder, self.data_file), 'a') as file:
+            file.write(f"Name: {name}, Registration Number: {reg_number}\n")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = DataCollectionApp(root)
-    root.mainloop()
+    app = DataCollectionApp()
+    name = input("Enter your name: ")
+    reg_number = input("Enter your registration number: ")
+
+    try:
+        app.capture_front_faces(name, reg_number)
+    except Exception as e:
+        print(f"An error occurred: {e}")
